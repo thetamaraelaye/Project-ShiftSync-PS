@@ -227,6 +227,9 @@ export class AnalyticsService {
 
     const locationFilter = await this.buildLocationFilter(userRole, userId);
 
+    const managedLocationIds =
+      userRole === 'MANAGER' ? await this.getManagedLocationIds(userId) : [];
+
     const [
       totalStaff,
       shiftsThisWeek,
@@ -235,7 +238,22 @@ export class AnalyticsService {
       overtimeAtRisk,
       onDutyNow,
     ] = await Promise.all([
-      this.prisma.user.count({ where: { role: 'STAFF', status: 'ACTIVE' } }),
+      this.prisma.user.count({
+        where: {
+          role: 'STAFF',
+          status: 'ACTIVE',
+          ...(userRole === 'MANAGER'
+            ? {
+                locationLinks: {
+                  some: {
+                    type: 'CERTIFIED',
+                    locationId: { in: managedLocationIds },
+                  },
+                },
+              }
+            : {}),
+        },
+      }),
 
       this.prisma.shift.count({
         where: { startTime: { gte: weekStart, lt: weekEnd }, ...locationFilter },
@@ -249,16 +267,27 @@ export class AnalyticsService {
         },
       }),
 
-      this.prisma.swapRequest.count({ where: { status: 'MANAGER_REVIEW' } }),
+      this.prisma.swapRequest.count({
+        where: {
+          status: 'MANAGER_REVIEW',
+          ...(userRole === 'MANAGER'
+            ? {
+                shift: {
+                  locationId: { in: managedLocationIds },
+                },
+              }
+            : {}),
+        },
+      }),
 
       // Staff who are at 35+ hours this week
-      this.getOvertimeAtRiskCount(weekStart, weekEnd),
+      this.getOvertimeAtRiskCount(weekStart, weekEnd, locationFilter),
 
       // Staff currently in an active shift
       this.prisma.shiftAssignment.count({
         where: {
           status: { not: 'CANCELLED' },
-          shift: { startTime: { lte: now }, endTime: { gte: now } },
+          shift: { startTime: { lte: now }, endTime: { gte: now }, ...locationFilter },
         },
       }),
     ]);
@@ -311,11 +340,7 @@ export class AnalyticsService {
     }
 
     // Manager: only their managed locations
-    const managedLinks = await this.prisma.userLocation.findMany({
-      where: { userId, type: 'MANAGED' },
-      select: { locationId: true },
-    });
-    const managedIds = managedLinks.map((l) => l.locationId);
+    const managedIds = await this.getManagedLocationIds(userId);
 
     if (locationId && managedIds.includes(locationId)) {
       return { locationId };
@@ -324,11 +349,15 @@ export class AnalyticsService {
     return { locationId: { in: managedIds } };
   }
 
-  private async getOvertimeAtRiskCount(weekStart: Date, weekEnd: Date): Promise<number> {
+  private async getOvertimeAtRiskCount(
+    weekStart: Date,
+    weekEnd: Date,
+    locationFilter: any,
+  ): Promise<number> {
     const assignments = await this.prisma.shiftAssignment.findMany({
       where: {
         status: { not: 'CANCELLED' },
-        shift: { startTime: { gte: weekStart, lt: weekEnd } },
+        shift: { startTime: { gte: weekStart, lt: weekEnd }, ...locationFilter },
       },
       include: {
         shift: { select: { startTime: true, endTime: true } },
@@ -342,5 +371,14 @@ export class AnalyticsService {
     }
 
     return Object.values(userHours).filter((h) => h >= 35).length;
+  }
+
+  private async getManagedLocationIds(userId: string): Promise<string[]> {
+    const managedLinks = await this.prisma.userLocation.findMany({
+      where: { userId, type: 'MANAGED' },
+      select: { locationId: true },
+    });
+
+    return managedLinks.map((l) => l.locationId);
   }
 }

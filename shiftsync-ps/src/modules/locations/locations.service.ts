@@ -19,9 +19,15 @@ export class LocationsService {
       });
     }
 
-    // Managers and staff only see their assigned locations
+    // Managers only see locations they MANAGE.
+    // Staff see locations they are linked to (typically CERTIFIED).
+    const linkWhere: any = { userId };
+    if (userRole === 'MANAGER') {
+      linkWhere.type = 'MANAGED';
+    }
+
     const links = await this.prisma.userLocation.findMany({
-      where: { userId },
+      where: linkWhere,
       select: { locationId: true },
     });
     const ids = links.map((l) => l.locationId);
@@ -92,8 +98,19 @@ export class LocationsService {
     return this.prisma.userLocation.delete({ where: { id: link.id } });
   }
 
-  async getStaff(locationId: string) {
+  async getStaff(locationId: string, userRole: string, userId: string) {
     await this.findById(locationId);
+
+    if (userRole === 'MANAGER') {
+      const managesLocation = await this.prisma.userLocation.findFirst({
+        where: { userId, locationId, type: 'MANAGED' },
+        select: { id: true },
+      });
+
+      if (!managesLocation) {
+        throw new ForbiddenException('No access to this location');
+      }
+    }
 
     return this.prisma.userLocation.findMany({
       where: { locationId },

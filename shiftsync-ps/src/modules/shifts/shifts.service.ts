@@ -94,7 +94,9 @@ export class ShiftsService {
     return shift;
   }
 
-  async create(dto: CreateShiftDto, creatorId: string) {
+  async create(dto: CreateShiftDto, creatorId: string, actorRole: string) {
+    await this.checkManagerAccess(dto.locationId, actorRole, creatorId);
+
     const location = await this.prisma.location.findUnique({ where: { id: dto.locationId } });
     if (!location) throw new NotFoundException('Location not found');
 
@@ -187,7 +189,9 @@ export class ShiftsService {
     return { message: 'Shift deleted' };
   }
 
-  async publishWeek(dto: PublishWeekDto, actorId: string) {
+  async publishWeek(dto: PublishWeekDto, actorId: string, actorRole: string) {
+    await this.checkManagerAccess(dto.locationId, actorRole, actorId);
+
     const weekStart = new Date(dto.weekStart);
     const weekEnd = addDays(weekStart, 7);
 
@@ -213,7 +217,13 @@ export class ShiftsService {
     return { published: result.count, weekStart: dto.weekStart };
   }
 
-  async unpublishWeek(dto: { weekStart: string; locationId: string; force?: boolean }, actorId: string) {
+  async unpublishWeek(
+    dto: { weekStart: string; locationId: string; force?: boolean },
+    actorId: string,
+    actorRole: string,
+  ) {
+    await this.checkManagerAccess(dto.locationId, actorRole, actorId);
+
     const weekStart = new Date(dto.weekStart);
     const weekEnd = addDays(weekStart, 7);
     const cutoff = new Date(Date.now() + EDIT_CUTOFF_HOURS * 3600 * 1000);

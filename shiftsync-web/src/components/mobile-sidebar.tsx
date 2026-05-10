@@ -15,15 +15,21 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { getStoredUser, type UserRole } from "@/lib/auth"
 
-const navItems = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Schedule", href: "/schedule", icon: Calendar },
-  { name: "Staff", href: "/staff", icon: Users },
-  { name: "Coverage", href: "/coverage", icon: Shield },
-  { name: "Analytics", href: "/analytics", icon: BarChart3 },
-  { name: "Audit", href: "/audit", icon: FileText },
-  { name: "Notifications", href: "/notifications", icon: Bell },
+const navItems: Array<{
+  name: string
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  roles: UserRole[]
+}> = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["ADMIN", "MANAGER", "STAFF"] },
+  { name: "Schedule", href: "/schedule", icon: Calendar, roles: ["ADMIN", "MANAGER", "STAFF"] },
+  { name: "Staff", href: "/staff", icon: Users, roles: ["ADMIN", "MANAGER"] },
+  { name: "Coverage", href: "/coverage", icon: Shield, roles: ["ADMIN", "MANAGER", "STAFF"] },
+  { name: "Analytics", href: "/analytics", icon: BarChart3, roles: ["ADMIN", "MANAGER"] },
+  { name: "Audit", href: "/audit", icon: FileText, roles: ["ADMIN"] },
+  { name: "Notifications", href: "/notifications", icon: Bell, roles: ["ADMIN", "MANAGER", "STAFF"] },
 ]
 
 interface MobileSidebarProps {
@@ -33,6 +39,8 @@ interface MobileSidebarProps {
 
 export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
   const pathname = usePathname()
+  const role = getStoredUser()?.role ?? "STAFF"
+  const visibleItems = navItems.filter((item) => item.roles.includes(role))
 
   return (
     <>
@@ -73,7 +81,7 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-3">
           <ul className="space-y-1">
-            {navItems.map((item) => {
+            {visibleItems.map((item) => {
               const isActive = pathname === item.href
               const Icon = item.icon
 

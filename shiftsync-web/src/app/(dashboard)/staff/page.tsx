@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Loader2, Search, Calendar } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -10,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useUsers, useUser } from '@/hooks/useUsers'
+import { getStoredUser } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 
 const ROLE_COLORS: Record<string, string> = {
@@ -25,8 +28,18 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export default function StaffPage() {
+  const router = useRouter()
+  const user = getStoredUser()
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (user?.role === 'STAFF') {
+      router.replace('/dashboard')
+    }
+  }, [router, user?.role])
+
+  if (user?.role === 'STAFF') return null
 
   const { data, isLoading } = useUsers()
   const users = data ?? []

@@ -74,7 +74,11 @@ export class LocationsController {
   @Get(':id/staff')
   @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'Get all staff at a location' })
-  getStaff(@Param('id') locationId: string) {
-    return this.locationsService.getStaff(locationId);
+  getStaff(
+    @Param('id') locationId: string,
+    @CurrentUser('role') role: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.locationsService.getStaff(locationId, role, userId);
   }
 }

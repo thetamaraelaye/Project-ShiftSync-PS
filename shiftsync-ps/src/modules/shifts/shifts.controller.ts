@@ -42,8 +42,12 @@ export class ShiftsController {
   @Post()
   @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'Create a shift' })
-  create(@Body() dto: CreateShiftDto, @CurrentUser('id') actorId: string) {
-    return this.shiftsService.create(dto, actorId);
+  create(
+    @Body() dto: CreateShiftDto,
+    @CurrentUser('id') actorId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return this.shiftsService.create(dto, actorId, role);
   }
 
   @Patch(':id')
@@ -72,8 +76,12 @@ export class ShiftsController {
   @Post('publish')
   @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'Publish all DRAFT shifts for a location+week' })
-  publish(@Body() dto: PublishWeekDto, @CurrentUser('id') actorId: string) {
-    return this.shiftsService.publishWeek(dto, actorId);
+  publish(
+    @Body() dto: PublishWeekDto,
+    @CurrentUser('id') actorId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return this.shiftsService.publishWeek(dto, actorId, role);
   }
 
   @Post('unpublish')
@@ -82,7 +90,8 @@ export class ShiftsController {
   unpublish(
     @Body() dto: { weekStart: string; locationId: string; force?: boolean },
     @CurrentUser('id') actorId: string,
+    @CurrentUser('role') role: string,
   ) {
-    return this.shiftsService.unpublishWeek(dto, actorId);
+    return this.shiftsService.unpublishWeek(dto, actorId, role);
   }
 }
