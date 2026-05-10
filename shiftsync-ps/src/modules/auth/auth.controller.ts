@@ -18,13 +18,18 @@ import { JwtAuthGuard, RolesGuard, Public, Roles, CurrentUser } from '@common';
 import { env } from '@configs';
 
 const COOKIE_NAME = 'access_token';
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  sameSite: 'lax' as const,
-  secure: env.NODE_ENV === 'production',
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  path: '/',
-};
+
+function getCookieOptions() {
+  const isProduction = env.NODE_ENV === 'production';
+
+  return {
+    httpOnly: true,
+    sameSite: (isProduction ? 'none' : 'lax') as const,
+    secure: isProduction,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/',
+  };
+}
 
 @SkipThrottle()
 @ApiTags('Auth')
@@ -42,7 +47,7 @@ export class AuthController {
     const result = await this.authService.login(dto);
 
     // Set the JWT in an httpOnly cookie (XSS-proof)
-    res.cookie(COOKIE_NAME, result.data.accessToken, COOKIE_OPTIONS);
+    res.cookie(COOKIE_NAME, result.data.accessToken, getCookieOptions());
 
     // Return user info but NOT the token in the JSON body for security
     // (token is in the cookie now). We still return accessToken for backwards
@@ -55,7 +60,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout — clears the auth cookie' })
   logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie(COOKIE_NAME, { path: '/' });
+    const options = getCookieOptions();
+    res.clearCookie(COOKIE_NAME, {
+      path: options.path,
+      sameSite: options.sameSite,
+      secure: options.secure,
+    });
     return { message: 'Logged out successfully' };
   }
 
