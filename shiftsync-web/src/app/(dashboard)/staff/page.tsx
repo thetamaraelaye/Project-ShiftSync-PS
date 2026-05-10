@@ -168,14 +168,14 @@ function StaffDrawer({ userId, onClose }: { userId: string | null; onClose: () =
 
   return (
     <Sheet open={!!userId} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-lg overflow-y-auto">
+      <SheetContent className="sm:max-w-xl overflow-y-auto p-0">
         {isLoading || !user ? (
-          <div className="flex items-center justify-center h-full">
+          <div className="flex items-center justify-center h-full p-6">
             <Loader2 className="size-5 animate-spin text-slate-400" />
           </div>
         ) : (
-          <>
-            <SheetHeader>
+          <div className="px-6 pb-6">
+            <SheetHeader className="px-0 pt-6">
               <div className="flex items-center gap-3">
                 <Avatar className="size-12">
                   <AvatarFallback className="bg-violet-100 text-violet-700 text-base font-semibold">
@@ -184,10 +184,10 @@ function StaffDrawer({ userId, onClose }: { userId: string | null; onClose: () =
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <SheetTitle>
+                  <SheetTitle className="text-xl tracking-tight text-slate-900">
                     {user.firstName} {user.lastName}
                   </SheetTitle>
-                  <p className="text-sm text-slate-500">{user.email}</p>
+                  <p className="text-sm text-slate-600 mt-0.5">{user.email}</p>
                 </div>
               </div>
             </SheetHeader>
@@ -254,13 +254,13 @@ function StaffDrawer({ userId, onClose }: { userId: string | null; onClose: () =
               </div>
 
               <Link href={`/staff/${user.id}/availability`} className="block">
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full h-10">
                   <Calendar className="size-4 mr-2" />
                   View Availability
                 </Button>
               </Link>
             </div>
-          </>
+          </div>
         )}
       </SheetContent>
     </Sheet>
@@ -269,9 +269,9 @@ function StaffDrawer({ userId, onClose }: { userId: string | null; onClose: () =
 
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex justify-between items-center text-sm">
-      <span className="text-slate-500">{label}</span>
-      <span className="text-slate-900">{children}</span>
+    <div className="flex justify-between items-center text-sm rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5">
+      <span className="text-slate-600 font-medium">{label}</span>
+      <span className="text-slate-900 font-semibold">{children}</span>
     </div>
   )
 }

@@ -2,14 +2,19 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { addDays, format, startOfWeek, subDays } from 'date-fns'
+import { fromZonedTime } from 'date-fns-tz'
 import { ChevronLeft, ChevronRight, Loader2, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { WeekGrid, type WeekShift } from '@/components/schedule/WeekGrid'
 import { AssignmentModal } from '@/components/schedule/AssignmentModal'
-import { useWeekSchedule, usePublishWeek } from '@/hooks/useSchedule'
+import { useCreateShift, useWeekSchedule, usePublishWeek } from '@/hooks/useSchedule'
 import { getStoredUser } from '@/lib/auth'
 import api from '@/lib/api'
 import { toast } from 'sonner'
@@ -19,6 +24,23 @@ interface Location {
   name: string
   city: string
   timezone: string
+}
+
+const SKILL_OPTIONS = [
+  'BARTENDER',
+  'SERVER',
+  'COOK',
+  'HOST',
+  'LINE_COOK',
+  'BARBACK',
+] as const
+
+type CreateShiftForm = {
+  startTime: string
+  endTime: string
+  requiredSkill: string
+  headcount: string
+  notes: string
 }
 
 export default function SchedulePage() {
@@ -33,6 +55,17 @@ export default function SchedulePage() {
   const weekStartStr = format(weekStart, 'yyyy-MM-dd')
   const schedule = useWeekSchedule(weekStartStr, locationId || undefined)
   const publish = usePublishWeek()
+  const createShift = useCreateShift()
+  const [createDate, setCreateDate] = useState<Date | null>(null)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [createErrors, setCreateErrors] = useState<Record<string, string>>({})
+  const [createForm, setCreateForm] = useState<CreateShiftForm>({
+    startTime: '',
+    endTime: '',
+    requiredSkill: 'SERVER',
+    headcount: '1',
+    notes: '',
+  })
 
   // Load locations
   useEffect(() => {
@@ -64,6 +97,11 @@ export default function SchedulePage() {
     }))
   }, [schedule.data])
 
+  const selectedLocation = useMemo(
+    () => locations.find((l) => l.id === locationId) ?? null,
+    [locations, locationId]
+  )
+
   const draftShifts = shifts.filter((s) => s.status === 'DRAFT').length
 
   function handlePublish() {
@@ -76,6 +114,75 @@ export default function SchedulePage() {
           toast.success(`Published ${count} shift${count === 1 ? '' : 's'}`)
         },
         onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed to publish'),
+      }
+    )
+  }
+
+  function handleOpenCreateShift(day: Date) {
+    if (!locationId) {
+      toast.error('Select a location first')
+      return
+    }
+
+    const datePart = format(day, 'yyyy-MM-dd')
+    setCreateDate(day)
+    setCreateErrors({})
+    setCreateForm({
+      startTime: `${datePart}T09:00`,
+      endTime: `${datePart}T17:00`,
+      requiredSkill: 'SERVER',
+      headcount: '1',
+      notes: '',
+    })
+    setIsCreateOpen(true)
+  }
+
+  function validateCreateForm() {
+    const nextErrors: Record<string, string> = {}
+    const headcount = Number(createForm.headcount)
+
+    if (!locationId) nextErrors.locationId = 'Location is required'
+    if (!createForm.startTime) nextErrors.startTime = 'Start time is required'
+    if (!createForm.endTime) nextErrors.endTime = 'End time is required'
+    if (!createForm.requiredSkill) nextErrors.requiredSkill = 'Skill is required'
+    if (!Number.isInteger(headcount) || headcount < 1 || headcount > 20) {
+      nextErrors.headcount = 'Headcount must be an integer between 1 and 20'
+    }
+
+    if (createForm.startTime && createForm.endTime) {
+      const startTs = new Date(createForm.startTime).getTime()
+      const endTs = new Date(createForm.endTime).getTime()
+      if (Number.isNaN(startTs) || Number.isNaN(endTs)) {
+        nextErrors.endTime = 'Please enter valid date and time values'
+      } else if (endTs <= startTs) {
+        nextErrors.endTime = 'End time must be after start time'
+      }
+    }
+
+    setCreateErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
+
+  function handleCreateShift() {
+    if (!selectedLocation || !validateCreateForm()) return
+
+    createShift.mutate(
+      {
+        locationId,
+        startTime: fromZonedTime(createForm.startTime, selectedLocation.timezone).toISOString(),
+        endTime: fromZonedTime(createForm.endTime, selectedLocation.timezone).toISOString(),
+        requiredSkill: createForm.requiredSkill,
+        headcount: Number(createForm.headcount),
+        notes: createForm.notes.trim() || undefined,
+      },
+      {
+        onSuccess: () => {
+          toast.success('Shift created')
+          setIsCreateOpen(false)
+        },
+        onError: (e: any) => {
+          toast.error(e.response?.data?.message ?? 'Failed to create shift')
+        },
       }
     )
   }
@@ -184,6 +291,7 @@ export default function SchedulePage() {
           shifts={shifts}
           canCreate={isManagerOrAdmin}
           onShiftClick={setSelectedShift}
+          onCreateShift={handleOpenCreateShift}
         />
       )}
 
@@ -207,6 +315,103 @@ export default function SchedulePage() {
           }
         }
       />
+
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Create Shift</DialogTitle>
+            <DialogDescription>
+              {createDate ? `${format(createDate, 'EEE, MMM d')} at ${selectedLocation?.name ?? 'selected location'}` : 'Add a new shift'}
+              {selectedLocation?.timezone ? ` (${selectedLocation.timezone})` : ''}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-1">
+            <div className="grid gap-2">
+              <Label htmlFor="create-start-time">Start time</Label>
+              <Input
+                id="create-start-time"
+                type="datetime-local"
+                value={createForm.startTime}
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, startTime: e.target.value }))}
+              />
+              {createErrors.startTime && <p className="text-xs text-red-600">{createErrors.startTime}</p>}
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="create-end-time">End time</Label>
+              <Input
+                id="create-end-time"
+                type="datetime-local"
+                value={createForm.endTime}
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, endTime: e.target.value }))}
+              />
+              {createErrors.endTime && <p className="text-xs text-red-600">{createErrors.endTime}</p>}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="create-required-skill">Required skill</Label>
+                <Select
+                  value={createForm.requiredSkill}
+                  onValueChange={(value) => setCreateForm((prev) => ({ ...prev, requiredSkill: value }))}
+                >
+                  <SelectTrigger id="create-required-skill">
+                    <SelectValue placeholder="Select skill" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SKILL_OPTIONS.map((skill) => (
+                      <SelectItem key={skill} value={skill}>
+                        {skill.replace('_', ' ')}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {createErrors.requiredSkill && <p className="text-xs text-red-600">{createErrors.requiredSkill}</p>}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="create-headcount">Headcount</Label>
+                <Input
+                  id="create-headcount"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={createForm.headcount}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, headcount: e.target.value }))}
+                />
+                {createErrors.headcount && <p className="text-xs text-red-600">{createErrors.headcount}</p>}
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="create-notes">Notes (optional)</Label>
+              <Textarea
+                id="create-notes"
+                placeholder="Add shift notes"
+                value={createForm.notes}
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, notes: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateOpen(false)} disabled={createShift.isPending}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateShift} disabled={createShift.isPending} className="bg-violet-600 hover:bg-violet-700">
+              {createShift.isPending ? (
+                <>
+                  <Loader2 className="size-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Shift'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

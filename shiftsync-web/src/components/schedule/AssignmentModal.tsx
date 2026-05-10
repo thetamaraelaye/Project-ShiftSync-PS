@@ -141,15 +141,17 @@ export function AssignmentModal({ open, onClose, shift }: AssignmentModalProps) 
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0">
-        <DialogDescription className="sr-only">Assign a qualified staff member to this shift. Constraint violations will be shown before confirmation.</DialogDescription>
+      <DialogContent className="max-w-5xl max-h-[92vh] overflow-hidden flex flex-col p-0">
         <DialogHeader className="px-6 pt-6">
-          <DialogTitle className="text-lg">Assign Staff to Shift</DialogTitle>
+          <DialogTitle className="text-xl tracking-tight text-slate-900">Assign Staff to Shift</DialogTitle>
+          <DialogDescription className="text-sm text-slate-600">
+            Select a qualified teammate, review rule checks, then confirm assignment.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 px-6 pb-6 overflow-y-auto">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-5 px-6 pb-6 overflow-y-auto">
           {/* Left panel — Shift details */}
-          <aside className="md:col-span-2 space-y-3 rounded-lg bg-slate-50 p-4 border border-slate-200">
+          <aside className="md:col-span-2 space-y-4 rounded-lg bg-slate-50 p-5 border border-slate-200">
             <div>
               <div className="flex items-center gap-2 text-xs font-medium text-slate-500 uppercase tracking-wider">
                 <MapPin className="size-3" />
@@ -210,11 +212,11 @@ export function AssignmentModal({ open, onClose, shift }: AssignmentModalProps) 
                 placeholder="Search staff…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
+                className="pl-9 h-10"
               />
             </div>
 
-            <ScrollArea className="h-48 rounded-md border border-slate-200">
+            <ScrollArea className="h-60 rounded-md border border-slate-200 bg-white">
               <div className="p-1">
                 {staffLoading ? (
                   <div className="p-4 text-center text-sm text-slate-500">Loading…</div>

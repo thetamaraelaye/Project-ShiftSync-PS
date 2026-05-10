@@ -278,7 +278,7 @@ export function ScheduleGrid() {
 
       {/* Grid */}
       <div className="overflow-x-auto rounded-lg">
-        <div className="grid min-w-[900px] grid-cols-7 gap-2">
+        <div className="grid min-w-225 grid-cols-7 gap-2">
           {weekSchedule.map((daySchedule) => (
             <DayColumn key={daySchedule.day} daySchedule={daySchedule} />
           ))}
