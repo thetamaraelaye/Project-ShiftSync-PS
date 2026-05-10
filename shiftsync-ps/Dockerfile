@@ -6,7 +6,9 @@ RUN pnpm install --frozen-lockfile
 COPY prisma ./prisma
 COPY prisma.config.ts ./
 COPY tsconfig.json ./
-RUN pnpm prisma generate
+RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" \
+    DIRECT_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" \
+    pnpm prisma generate
 COPY . .
 RUN pnpm build
 ENV NODE_ENV=production
