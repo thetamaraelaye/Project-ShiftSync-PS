@@ -43,19 +43,19 @@ import { AuditModule } from './modules/audit/audit.module';
       {
         name: 'default',
         ttl: 60_000,
-        limit: process.env.NODE_ENV === 'production' ? 300 : 9999,
+        limit: process.env.NODE_ENV === 'production' ? 200 : 9999,
       },
       // Strict: login and password change — brute-force protection
       {
         name: 'auth',
         ttl: 60_000,
-        limit: process.env.NODE_ENV === 'production' ? 5 : 50,
+        limit: process.env.NODE_ENV === 'production' ? 200 : 9999,
       },
       // Burst: short-window flood protection
       {
         name: 'burst',
         ttl: 10_000,
-        limit: process.env.NODE_ENV === 'production' ? 60 : 9999,
+        limit: process.env.NODE_ENV === 'production' ? 200 : 9999,
       },
     ]),
     GlobalModule,

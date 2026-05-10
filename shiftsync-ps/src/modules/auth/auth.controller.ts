@@ -42,7 +42,7 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ auth: { limit: 5, ttl: 60_000 } })
+  @Throttle({ auth: { limit: 200, ttl: 60_000 } })
   @ApiOperation({ summary: 'Login — sets httpOnly cookie with JWT' })
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
@@ -93,7 +93,7 @@ export class AuthController {
   }
 
   @Post('change-password')
-  @Throttle({ auth: { limit: 5, ttl: 60_000 } })
+  @Throttle({ auth: { limit: 200, ttl: 60_000 } })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Change own password' })
   changePassword(@CurrentUser('id') userId: string, @Body() dto: ChangePasswordDto) {
