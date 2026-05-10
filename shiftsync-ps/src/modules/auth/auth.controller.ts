@@ -21,10 +21,11 @@ const COOKIE_NAME = 'access_token';
 
 function getCookieOptions() {
   const isProduction = env.NODE_ENV === 'production';
+  const sameSite: 'none' | 'lax' = isProduction ? 'none' : 'lax';
 
   return {
     httpOnly: true,
-    sameSite: (isProduction ? 'none' : 'lax') as const,
+    sameSite,
     secure: isProduction,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: '/',
