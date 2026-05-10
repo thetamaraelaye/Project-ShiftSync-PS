@@ -1820,17 +1820,82 @@ async function main() {
 
     const openShifts = [
       // ── 4 clean assignable shifts — happy path UI testing ──────────────────
-      { id: 'open_dt_mon_server', locationId: 'loc_downtown', date: NW_MON, startHour: 11, duration: 6, skill: Skill.SERVER },
-      { id: 'open_dt_wed_bar',    locationId: 'loc_downtown', date: NW_WED, startHour: 16, duration: 7, skill: Skill.BARTENDER },
-      { id: 'open_ms_thu_bar',    locationId: 'loc_mission',  date: NW_THU, startHour: 17, duration: 6, skill: Skill.BARTENDER },
-      { id: 'open_nyc_fri_bar',   locationId: 'loc_nyc',      date: NW_FRI, startHour: 18, duration: 6, skill: Skill.BARTENDER },
+      {
+        id: 'open_dt_mon_server',
+        locationId: 'loc_downtown',
+        date: NW_MON,
+        startHour: 11,
+        duration: 6,
+        skill: Skill.SERVER,
+      },
+      {
+        id: 'open_dt_wed_bar',
+        locationId: 'loc_downtown',
+        date: NW_WED,
+        startHour: 16,
+        duration: 7,
+        skill: Skill.BARTENDER,
+      },
+      {
+        id: 'open_ms_thu_bar',
+        locationId: 'loc_mission',
+        date: NW_THU,
+        startHour: 17,
+        duration: 6,
+        skill: Skill.BARTENDER,
+      },
+      {
+        id: 'open_nyc_fri_bar',
+        locationId: 'loc_nyc',
+        date: NW_FRI,
+        startHour: 18,
+        duration: 6,
+        skill: Skill.BARTENDER,
+      },
       // ── Suggestion scenario: partially filled, 2 open slots ────────────────
       // Assign one then try assigning a wrong-skill person → suggestions appear
-      { id: 'open_dt_fri_srv',    locationId: 'loc_downtown', date: NW_FRI, startHour: 18, duration: 6, skill: Skill.SERVER,    headcount: 2 },
-      { id: 'open_dt_sat_bar',    locationId: 'loc_downtown', date: NW_SAT, startHour: 18, duration: 7, skill: Skill.BARTENDER, headcount: 2 },
-      { id: 'open_ms_mon_bar',    locationId: 'loc_mission',  date: NW_MON, startHour: 17, duration: 7, skill: Skill.BARTENDER },
-      { id: 'open_nyc_mon_bar',   locationId: 'loc_nyc',      date: NW_MON, startHour: 17, duration: 7, skill: Skill.BARTENDER },
-      { id: 'open_dt_tue_host',   locationId: 'loc_downtown', date: NW_TUE, startHour: 11, duration: 8, skill: Skill.HOST },
+      {
+        id: 'open_dt_fri_srv',
+        locationId: 'loc_downtown',
+        date: NW_FRI,
+        startHour: 18,
+        duration: 6,
+        skill: Skill.SERVER,
+        headcount: 2,
+      },
+      {
+        id: 'open_dt_sat_bar',
+        locationId: 'loc_downtown',
+        date: NW_SAT,
+        startHour: 18,
+        duration: 7,
+        skill: Skill.BARTENDER,
+        headcount: 2,
+      },
+      {
+        id: 'open_ms_mon_bar',
+        locationId: 'loc_mission',
+        date: NW_MON,
+        startHour: 17,
+        duration: 7,
+        skill: Skill.BARTENDER,
+      },
+      {
+        id: 'open_nyc_mon_bar',
+        locationId: 'loc_nyc',
+        date: NW_MON,
+        startHour: 17,
+        duration: 7,
+        skill: Skill.BARTENDER,
+      },
+      {
+        id: 'open_dt_tue_host',
+        locationId: 'loc_downtown',
+        date: NW_TUE,
+        startHour: 11,
+        duration: 8,
+        skill: Skill.HOST,
+      },
     ];
 
     for (const s of openShifts) {
@@ -1860,9 +1925,10 @@ async function main() {
       });
     }
 
-    console.log(`✅ Open shifts for next week (${NW_MON} to ${NW_SAT}): ${openShifts.length} slots ready to assign`);
+    console.log(
+      `✅ Open shifts for next week (${NW_MON} to ${NW_SAT}): ${openShifts.length} slots ready to assign`,
+    );
   }
-
 
   console.log(`
 ╔════════════════════════════════════════════════════════════╗

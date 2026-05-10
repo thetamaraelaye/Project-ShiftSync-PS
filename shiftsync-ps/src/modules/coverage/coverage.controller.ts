@@ -36,10 +36,7 @@ export class CoverageController {
   @ApiOperation({
     summary: 'Get requests awaiting manager approval (Manager: their locations only)',
   })
-  getPendingApprovals(
-    @CurrentUser('id') actorId: string,
-    @CurrentUser('role') role: string,
-  ) {
+  getPendingApprovals(@CurrentUser('id') actorId: string, @CurrentUser('role') role: string) {
     return this.coverageService.getPendingApprovals(actorId, role);
   }
 
