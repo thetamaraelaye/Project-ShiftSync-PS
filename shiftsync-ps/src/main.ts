@@ -7,8 +7,29 @@ import { env } from '@configs';
 import { ResponseInterceptor, GlobalExceptionFilter } from '@common';
 import { VersioningType } from '@nestjs/common';
 
+function normalizeOrigin(url: string): string {
+  return url.trim().replace(/\/$/, '');
+}
+
+function buildAllowedOrigins(): string[] {
+  const configured = (env.FRONTEND_URL ?? '')
+    .split(',')
+    .map((value) => normalizeOrigin(value))
+    .filter(Boolean);
+
+  return Array.from(
+    new Set([
+      ...configured,
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'https://project-shift-sync-ps.vercel.app',
+    ]),
+  );
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const allowedOrigins = buildAllowedOrigins();
 
   // Trust proxy headers (for proper IP detection behind load balancers / Vercel / Railway)
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
@@ -18,11 +39,20 @@ async function bootstrap() {
 
   // CORS with credentials for cookie-based auth
   app.enableCors({
-    origin: [
-      env.FRONTEND_URL ?? 'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:3000',
-    ],
+    origin: (origin, callback) => {
+      // Allow same-origin and non-browser clients with no Origin header.
+      if (!origin) return callback(null, true);
+
+      const normalized = normalizeOrigin(origin);
+      const isExplicitlyAllowed = allowedOrigins.includes(normalized);
+      const isVercelPreview = /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(normalized);
+
+      if (isExplicitlyAllowed || isVercelPreview) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`), false);
+    },
     credentials: true,
     exposedHeaders: [
       'X-RateLimit-Limit',

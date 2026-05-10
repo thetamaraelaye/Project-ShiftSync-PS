@@ -12,13 +12,42 @@ import { JwtService } from '@nestjs/jwt';
 import { Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
-@WebSocketGateway({
-  cors: {
-    origin: [
-      process.env.FRONTEND_URL || 'http://localhost:3000',
+function normalizeOrigin(url: string): string {
+  return url.trim().replace(/\/$/, '');
+}
+
+function buildAllowedOrigins(): string[] {
+  const configured = (process.env.FRONTEND_URL ?? '')
+    .split(',')
+    .map((value) => normalizeOrigin(value))
+    .filter(Boolean);
+
+  return Array.from(
+    new Set([
+      ...configured,
       'http://localhost:3000',
       'http://localhost:3001',
-    ],
+      'https://project-shift-sync-ps.vercel.app',
+    ]),
+  );
+}
+
+@WebSocketGateway({
+  cors: {
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+
+      const normalized = normalizeOrigin(origin);
+      const allowedOrigins = buildAllowedOrigins();
+      const isExplicitlyAllowed = allowedOrigins.includes(normalized);
+      const isVercelPreview = /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(normalized);
+
+      if (isExplicitlyAllowed || isVercelPreview) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`Socket CORS blocked for origin: ${origin}`), false);
+    },
     credentials: true,
   },
   namespace: '/realtime',
