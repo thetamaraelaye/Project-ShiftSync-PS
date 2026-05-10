@@ -11,6 +11,17 @@ const api = axios.create({
   withCredentials: true,
 })
 
+api.interceptors.request.use((config) => {
+  if (typeof window === 'undefined') return config
+
+  const token = localStorage.getItem('access_token_fallback')
+  if (!token) return config
+
+  config.headers = config.headers ?? {}
+  config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
 // Long-running endpoints get their own timeout via the second axios argument.
 // Usage: api.post('/assignments/preview', body, { timeout: API_TIMEOUTS.CONSTRAINT_PREVIEW })
 export const API_TIMEOUTS = {
@@ -49,6 +60,7 @@ api.interceptors.response.use(
     // 401 — cookie expired or missing → redirect to login
     if (status === 401 && typeof window !== 'undefined') {
       if (!window.location.pathname.startsWith('/login')) {
+        localStorage.removeItem('access_token_fallback')
         localStorage.removeItem('user')
         window.location.href = '/login'
       }

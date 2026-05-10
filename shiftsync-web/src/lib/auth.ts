@@ -17,6 +17,7 @@ export interface AuthUser {
 }
 
 const USER_KEY = 'user'
+const TOKEN_KEY = 'access_token_fallback'
 
 // ─── User info storage (NOT the token — that's in an httpOnly cookie) ───────
 export function getStoredUser(): AuthUser | null {
@@ -31,6 +32,19 @@ export function getStoredUser(): AuthUser | null {
 
 export function storeUser(user: AuthUser) {
   localStorage.setItem(USER_KEY, JSON.stringify(user))
+}
+
+export function getStoredToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+export function storeToken(token: string) {
+  localStorage.setItem(TOKEN_KEY, token)
+}
+
+export function clearToken() {
+  localStorage.removeItem(TOKEN_KEY)
 }
 
 export function clearUser() {
@@ -50,6 +64,7 @@ export async function logout() {
   } catch {
     // Ignore — we're logging out either way
   }
+  clearToken()
   clearUser()
   if (typeof window !== 'undefined') {
     window.location.href = '/login'

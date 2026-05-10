@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client'
+import { getStoredToken } from './auth'
 
 // Use globalThis to survive Next.js HMR module resets.
 // Without this, every hot-reload creates a fresh socket while the old one
@@ -20,6 +21,9 @@ export function getSocket(): Socket {
     (process.env.NEXT_PUBLIC_WS_URL ?? 'http://localhost:8030') + '/realtime',
     {
       withCredentials: true,
+      auth: {
+        token: getStoredToken() ?? undefined,
+      },
       reconnectionAttempts: 3,
       reconnectionDelay: 3000,
       reconnectionDelayMax: 10000,

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import api from '@/lib/api'
-import { storeUser, DEMO_ACCOUNTS, type AuthUser } from '@/lib/auth'
+import { storeUser, storeToken, DEMO_ACCOUNTS, type AuthUser } from '@/lib/auth'
 
 interface LoginResponse {
   data: {
@@ -52,8 +52,10 @@ export default function LoginPage() {
         password: loginPassword,
       })
 
-      // Token comes back in an httpOnly cookie via Set-Cookie; we only store the user info
-      const { user } = res.data.data
+      // Primary auth is the httpOnly cookie; we also persist the bearer token as a
+      // fallback for browsers that block third-party cookies in cross-site requests.
+      const { user, accessToken } = res.data.data
+      if (accessToken) storeToken(accessToken)
       storeUser(user)
       router.push('/dashboard')
     } catch (err: any) {
