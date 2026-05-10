@@ -1,0 +1,300 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Locations ────────────────────────────────────────────────────────────────
+
+model Location {
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  city      String
+  state     String
+  timezone  String   // IANA e.g. "America/Los_Angeles"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shifts    Shift[]
+  userLinks UserLocation[]
+
+  @@map("locations")
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+model User {
+  id                 String     @id @default(cuid())
+  email              String     @unique
+  passwordHash       String?
+  firstName          String
+  lastName           String
+  role               UserRole
+  status             UserStatus @default(ACTIVE)
+  desiredWeeklyHours Int?
+  timezone           String     @default("America/New_York")
+  resetToken         String?
+  resetTokenExpiry   DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  locationLinks             UserLocation[]
+  skills                    UserSkill[]
+  availability              Availability[]
+  availabilityExceptions    AvailabilityException[]
+  assignments               ShiftAssignment[]
+  swapRequestsInitiated     SwapRequest[]          @relation("SwapRequester")
+  swapRequestsTargeted      SwapRequest[]          @relation("SwapTarget")
+  notifications             Notification[]
+  auditLogs                 AuditLog[]             @relation("AuditActor")
+
+  @@map("users")
+}
+
+// Staff certified at a location OR manager assigned to a location
+model UserLocation {
+  id         String           @id @default(cuid())
+  userId     String
+  locationId String
+  type       UserLocationType
+  createdAt  DateTime         @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, locationId, type])
+  @@map("user_locations")
+}
+
+model UserSkill {
+  id     String @id @default(cuid())
+  userId String
+  skill  Skill
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skill])
+  @@map("user_skills")
+}
+
+// ─── Availability ─────────────────────────────────────────────────────────────
+
+model Availability {
+  id        String @id @default(cuid())
+  userId    String
+  dayOfWeek Int    // 0=Sunday … 6=Saturday
+  startTime String // "HH:MM" in user's timezone
+  endTime   String // "HH:MM" in user's timezone
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dayOfWeek])
+  @@map("availability")
+}
+
+// One-off date exceptions: unavailable or a different window than recurring
+model AvailabilityException {
+  id            String   @id @default(cuid())
+  userId        String
+  date          DateTime // UTC midnight of the specific date
+  isUnavailable Boolean  @default(true)
+  startTime     String?  // Override window start "HH:MM" if partially available
+  endTime       String?  // Override window end "HH:MM"
+  reason        String?
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("availability_exceptions")
+}
+
+// ─── Shifts ───────────────────────────────────────────────────────────────────
+
+model Shift {
+  id            String      @id @default(cuid())
+  locationId    String
+  startTime     DateTime    // UTC
+  endTime       DateTime    // UTC — may be next calendar day for overnight shifts
+  requiredSkill Skill
+  headcount     Int         @default(1)
+  status        ShiftStatus @default(DRAFT)
+  isPremium     Boolean     @default(false) // Fri/Sat evenings in location tz
+  notes         String?
+  createdById   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  location     Location          @relation(fields: [locationId], references: [id])
+  assignments  ShiftAssignment[]
+  swapRequests SwapRequest[]
+
+  @@map("shifts")
+}
+
+model ShiftAssignment {
+  id             String           @id @default(cuid())
+  shiftId        String
+  userId         String
+  status         AssignmentStatus @default(ASSIGNED)
+  assignedAt     DateTime         @default(now())
+  assignedById   String?
+  overrideReason String?          // Required for 7th consecutive day override
+
+  shift Shift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([shiftId, userId])
+  @@map("shift_assignments")
+}
+
+// ─── Swap / Coverage Requests ─────────────────────────────────────────────────
+
+model SwapRequest {
+  id          String     @id @default(cuid())
+  requesterId String
+  targetId    String?    // null for DROP requests
+  shiftId     String
+  type        SwapType
+  status      SwapStatus @default(PENDING)
+  reason      String?
+  expiresAt   DateTime   // Set to 24h before shift start for DROP; 7 days for SWAP
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  requester User  @relation("SwapRequester", fields: [requesterId], references: [id])
+  target    User? @relation("SwapTarget", fields: [targetId], references: [id])
+  shift     Shift @relation(fields: [shiftId], references: [id])
+
+  @@map("swap_requests")
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  metadata  Json?            // { shiftId, requestId, locationId, ... }
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String   // "Shift" | "ShiftAssignment" | "SwapRequest" | "User" | "Location"
+  entityId   String
+  action     String   // "SHIFT_CREATED" | "STAFF_ASSIGNED" | "SCHEDULE_PUBLISHED" | etc.
+  actorId    String?
+  actorRole  String?
+  actorName  String?
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ─── Files (keep from original template) ─────────────────────────────────────
+
+model File {
+  id        String  @id @default(cuid())
+  key       String
+  userId    String?
+  extension String?
+  url       String?
+  type      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("files")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  DEACTIVATED
+}
+
+enum UserLocationType {
+  CERTIFIED  // Staff can work at this location
+  MANAGED    // Manager oversees this location
+}
+
+enum Skill {
+  BARTENDER
+  SERVER
+  COOK
+  HOST
+  LINE_COOK
+  BARBACK
+}
+
+enum ShiftStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum AssignmentStatus {
+  ASSIGNED
+  CONFIRMED
+  CANCELLED
+}
+
+enum SwapType {
+  SWAP
+  DROP
+}
+
+enum SwapStatus {
+  PENDING          // Requester submitted
+  ACCEPTED         // Target accepted (SWAP only) — awaiting manager
+  MANAGER_REVIEW   // Sent to manager for approval
+  APPROVED         // Manager approved
+  REJECTED         // Manager or target rejected
+  CANCELLED        // Requester cancelled
+  EXPIRED          // Passed the expiry time unclaimed
+}
+
+enum NotificationType {
+  SHIFT_ASSIGNED
+  SHIFT_CHANGED
+  SHIFT_UNASSIGNED
+  SCHEDULE_PUBLISHED
+  SCHEDULE_UNPUBLISHED
+  SWAP_REQUEST
+  SWAP_ACCEPTED
+  SWAP_RESOLVED
+  COVERAGE_REQUEST
+  OVERTIME_WARNING
+  AVAILABILITY_CHANGED
+  GENERAL
+}
