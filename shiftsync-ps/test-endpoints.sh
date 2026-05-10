@@ -23,11 +23,21 @@ N='\033[0m'
 req() {
   # req METHOD PATH [BODY]  →  returns "STATUS|BODY"
   local method=$1 path=$2 body=${3:-}
-  local args=(-s -o /tmp/shiftsync-resp.json -w '%{http_code}' -b "$COOKIE_JAR" -c "$COOKIE_JAR" -X "$method" "$BASE$path" -H 'Content-Type: application/json')
+  local resp_file="/tmp/shiftsync-resp.json"
+  local args=(-s -o "$resp_file" -w '%{http_code}' -b "$COOKIE_JAR" -c "$COOKIE_JAR" -X "$method" "$BASE$path" -H 'Content-Type: application/json')
   [[ -n "$body" ]] && args+=(-d "$body")
   local code
-  code=$(curl "${args[@]}")
-  echo "$code|$(cat /tmp/shiftsync-resp.json)"
+  # Keep the suite running even when the API is unreachable.
+  code=$(curl "${args[@]}" || true)
+
+  local resp
+  if [[ -f "$resp_file" ]]; then
+    resp=$(cat "$resp_file")
+  else
+    resp='{"error":"no response body"}'
+  fi
+
+  echo "${code:-000}|$resp"
 }
 
 assert() {
@@ -193,11 +203,80 @@ rm -f "$COOKIE_JAR"
 RES=$(req POST "/auth/login" '{"email":"manager.sf@coastal-eats.com","password":"Password123!"}')
 assert "POST /auth/login (manager)" "200" "${RES%%|*}"
 
+section "Manager schedule creation — validation + happy path"
+RES=$(req GET "/locations")
+assert "Manager GET /locations" "200" "${RES%%|*}"
+MGR_LOC_ID=$(echo "${RES#*|}" | python3 -c "import sys,json; d=json.load(sys.stdin); items=d.get('data') or d or []; print(items[0]['id'] if items else '')" 2>/dev/null || echo "")
+echo "  → manager locationId=$MGR_LOC_ID"
+
+# Validation: missing requiredSkill should be rejected
+RES=$(req POST "/shifts" "{\"locationId\":\"$MGR_LOC_ID\",\"startTime\":\"2026-12-01T16:00:00.000Z\",\"endTime\":\"2026-12-01T23:00:00.000Z\",\"headcount\":1}")
+assert "POST /shifts validation (missing requiredSkill → 400)" "400" "${RES%%|*}"
+
+# Happy path: create a valid draft shift in the future
+RES=$(req POST "/shifts" "{\"locationId\":\"$MGR_LOC_ID\",\"startTime\":\"2026-12-02T17:00:00.000Z\",\"endTime\":\"2026-12-03T01:00:00.000Z\",\"requiredSkill\":\"SERVER\",\"headcount\":1,\"notes\":\"smoke test create shift\"}")
+assert "POST /shifts create valid draft shift" "2xx" "${RES%%|*}"
+NEW_SHIFT_ID=$(echo "${RES#*|}" | python3 -c "import sys,json; d=json.load(sys.stdin); payload=d.get('data') or d or {}; print(payload.get('id',''))" 2>/dev/null || echo "")
+echo "  → created shiftId=$NEW_SHIFT_ID"
+
+# Ensure week endpoint remains healthy after creation
+FUTURE_WEEK_START="2026-11-30"
+RES=$(req GET "/shifts/week?weekStart=$FUTURE_WEEK_START&locationId=$MGR_LOC_ID")
+assert "GET /shifts/week (future week after create)" "200" "${RES%%|*}"
+
 RES=$(req GET "/audit")
 assert "Manager → /audit (should be 403)" "403" "${RES%%|*}"
 
 RES=$(req GET "/coverage/requests/pending-approvals")
 assert "Manager → /coverage/pending-approvals (should be 200)" "200" "${RES%%|*}"
+MANAGER_PENDING_IDS=$(echo "${RES#*|}" | python3 -c "import sys,json; d=json.load(sys.stdin); r=d.get('data') or d or []; print(','.join(x.get('id','') for x in r if isinstance(x,dict) and x.get('id')))" 2>/dev/null || echo "")
+
+section "Role matrix — admin/manager/staff coverage controls"
+rm -f "$COOKIE_JAR"
+RES=$(req POST "/auth/login" '{"email":"admin@coastal-eats.com","password":"Password123!"}')
+assert "POST /auth/login (admin for role matrix)" "200" "${RES%%|*}"
+
+RES=$(req GET "/coverage/requests/pending-approvals")
+assert "Admin → /coverage/pending-approvals (global)" "200" "${RES%%|*}"
+ADMIN_PENDING_IDS=$(echo "${RES#*|}" | python3 -c "import sys,json; d=json.load(sys.stdin); r=d.get('data') or d or []; print(','.join(x.get('id','') for x in r if isinstance(x,dict) and x.get('id')))" 2>/dev/null || echo "")
+
+OUT_OF_SCOPE_ID=$(python3 - <<PY
+mgr = set(filter(None, "${MANAGER_PENDING_IDS}".split(',')))
+adm = [x for x in "${ADMIN_PENDING_IDS}".split(',') if x]
+candidate = ''
+for rid in adm:
+    if rid not in mgr:
+        candidate = rid
+        break
+print(candidate)
+PY
+)
+
+if [[ -n "$OUT_OF_SCOPE_ID" ]]; then
+  echo "  → found admin-only pending approval: $OUT_OF_SCOPE_ID"
+
+  rm -f "$COOKIE_JAR"
+  RES=$(req POST "/auth/login" '{"email":"manager.sf@coastal-eats.com","password":"Password123!"}')
+  assert "POST /auth/login (manager for scope check)" "200" "${RES%%|*}"
+
+  RES=$(req PATCH "/coverage/requests/$OUT_OF_SCOPE_ID/manager-decision" '{"decision":"REJECTED","reason":"scope check"}')
+  assert "Manager decision outside managed scope (should be 403)" "403" "${RES%%|*}"
+
+  rm -f "$COOKIE_JAR"
+  RES=$(req POST "/auth/login" '{"email":"admin@coastal-eats.com","password":"Password123!"}')
+  assert "POST /auth/login (admin for global decision)" "200" "${RES%%|*}"
+
+  RES=$(req PATCH "/coverage/requests/$OUT_OF_SCOPE_ID/manager-decision" '{"decision":"REJECTED","reason":"admin global approval test"}')
+  assert "Admin decision outside manager scope (should be allowed)" "2xx" "${RES%%|*}"
+else
+  echo "  → no admin-only pending request found in current seed; scope decision check skipped"
+fi
+
+TEST_REQUEST_ID=$(python3 - <<PY
+ids = [x for x in "${ADMIN_PENDING_IDS}".split(',') if x]
+print(ids[0] if ids else 'swapreq_accepted_state')
+PY
+)
 
 section "Swap workflow — full lifecycle"
 # Test the pending approvals list (seeded data has at least 1 swap in MANAGER_REVIEW)
@@ -228,6 +307,12 @@ assert "Staff → /audit (should be 403)" "403" "${RES%%|*}"
 
 RES=$(req GET "/analytics/overtime")
 assert "Staff → /analytics/overtime (should be 403)" "403" "${RES%%|*}"
+
+RES=$(req GET "/coverage/requests/pending-approvals")
+assert "Staff → /coverage/pending-approvals (should be 403)" "403" "${RES%%|*}"
+
+RES=$(req PATCH "/coverage/requests/$TEST_REQUEST_ID/manager-decision" '{"decision":"REJECTED","reason":"staff should not approve"}')
+assert "Staff → manager decision endpoint (should be 403)" "403" "${RES%%|*}"
 
 RES=$(req POST "/assignments/preview" '{"shiftId":"shift_dt_fri_bar_pm","userId":"user_sarah"}')
 assert "Staff → constraint preview (should be 200)" "200" "${RES%%|*}"
