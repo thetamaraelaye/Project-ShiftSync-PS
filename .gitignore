@@ -5,3 +5,10 @@ node_modules/
 *.log
 .DS_Store
 SUBMISSION_EMAIL.md
+
+# AI assistant files
+CLAUDE.md
+AGENTS.md
+**/CLAUDE.md
+**/AGENTS.md
+**/_ai-studio-pages/

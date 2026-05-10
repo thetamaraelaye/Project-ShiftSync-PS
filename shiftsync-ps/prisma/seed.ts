@@ -295,7 +295,7 @@ async function main() {
       desiredHours: 25,
     },
 
-    // Cross-timezone staff (key for Evaluation Scenario 3 — Timezone Tangle)
+    // Cross-timezone certified staff (SF + NYC locations)
     {
       id: 'user_liam',
       email: 'liam@coastal-eats.com',
@@ -307,7 +307,7 @@ async function main() {
       desiredHours: 40,
     },
 
-    // Staff for overtime trap scenario (Evaluation Scenario 2)
+    // Staff approaching weekly hour limits
     {
       id: 'user_alex',
       email: 'alex.s@coastal-eats.com',
@@ -488,7 +488,7 @@ async function main() {
     createShift('shift_dt_thu_dinner', 'loc_downtown', `2025-05-15`, 17, 7, Skill.SERVER),
     createShift('shift_dt_thu_bar', 'loc_downtown', `2025-05-15`, 17, 7, Skill.BARTENDER),
 
-    // FRIDAY PREMIUM SHIFTS (Evaluation Scenario 5 — Fairness)
+    // FRIDAY PREMIUM SHIFTS
     createShift(
       'shift_dt_fri_bar_pm',
       'loc_downtown',
@@ -537,7 +537,7 @@ async function main() {
       ShiftStatus.PUBLISHED,
     ),
 
-    // SUNDAY — The Sunday Night Chaos shift (Evaluation Scenario 1)
+    // SUNDAY
     createShift(
       'shift_dt_sun_server_7pm',
       'loc_downtown',
@@ -1862,12 +1862,7 @@ async function main() {
 
     console.log(`✅ Open shifts for next week (${NW_MON} to ${NW_SAT}): ${openShifts.length} slots ready to assign`);
   }
-  console.log(
-    `   Constraint demos: consecutive days (Priya), late NYC (Liam), weekend host (Wei), 14h hard block`,
-  );
-  console.log(
-    `   Fair Fri/Sat premium: Marcus gets 2 more → imbalance grows for fairness analytics`,
-  );
+
 
   console.log(`
 ╔════════════════════════════════════════════════════════════╗
@@ -1884,20 +1879,9 @@ async function main() {
 ║               liam@coastal-eats.com   (cross-tz, SF+NYC)   ║
 ║               dmitri@coastal-eats.com (line cook, 5pm-2am) ║
 ╠════════════════════════════════════════════════════════════╣
-║  6 Evaluation Scenarios:                                   ║
-║  1. Sunday Night Chaos   — shift_dt_sun_server_7pm         ║
-║  2. Overtime Trap        — alex has 40h, sat shift open    ║
-║  3. Timezone Tangle      — liam + nyc late shift           ║
-║  4. Simultaneous Assign  — friday bar shift                ║
-║  5. Fairness Complaint   — marcus:8 vs sarah:1             ║
-║  6. Regret Swap          — james/priya PENDING             ║
-╠════════════════════════════════════════════════════════════╣
-║  Constraint Demo Shifts:                                   ║
-║  DOUBLE_BOOKING  — shift_dt_fri_overlap_bar (try Sarah)    ║
-║  REST_PERIOD     — shift_dmitri_fri_morning (7h gap)       ║
-║  OVERNIGHT       — shift_ms_sat_overnight (11pm-3am)       ║
-║  DAILY_HOURS_HRD — shift_dt_long_14h (14h duration)       ║
-║  SWAP MANAGER_REVIEW — swapreq_accepted_state              ║
+║  Seeded shifts cover Sun-Sun across all 4 locations        ║
+║  Mix of open, assigned, and swap-pending shifts included   ║
+║  Premium flag applied to Fri/Sat evening shifts            ║
 ╚════════════════════════════════════════════════════════════╝
   `);
 }
