@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { format, addDays, isSameDay } from 'date-fns'
+import { format, addDays, isSameDay, isBefore, startOfDay } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { Plus, Star, AlertCircle } from 'lucide-react'
 import { Card } from '@/components/ui/card'
@@ -79,6 +79,7 @@ export function WeekGrid({ weekStart, shifts, canCreate, onShiftClick, onCreateS
           const dateKey = format(day, 'yyyy-MM-dd')
           const dayShifts = shiftsByDay[dateKey] ?? []
           const isToday = isSameDay(day, new Date())
+          const isPast = isBefore(startOfDay(day), startOfDay(new Date()))
           const isWeekend = day.getDay() === 0 || day.getDay() === 6
 
           return (
@@ -86,7 +87,8 @@ export function WeekGrid({ weekStart, shifts, canCreate, onShiftClick, onCreateS
               key={dateKey}
               className={cn(
                 'min-h-100 flex flex-col',
-                isWeekend && 'bg-slate-50/50'
+                isWeekend && 'bg-slate-50/50',
+                isPast && 'opacity-60'
               )}
             >
               {/* Day header */}
@@ -112,7 +114,7 @@ export function WeekGrid({ weekStart, shifts, canCreate, onShiftClick, onCreateS
                   <ShiftCard key={shift.id} shift={shift} onClick={() => onShiftClick(shift)} />
                 ))}
 
-                {canCreate && onCreateShift && (
+                {canCreate && onCreateShift && !isPast && (
                   <button
                     onClick={() => onCreateShift(day)}
                     className="w-full border border-dashed border-slate-300 rounded-md p-2 text-xs text-slate-400 hover:border-violet-300 hover:text-violet-600 hover:bg-violet-50 transition-colors flex items-center justify-center gap-1"

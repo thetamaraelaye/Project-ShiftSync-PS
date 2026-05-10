@@ -43,6 +43,7 @@ interface AssignmentModalProps {
   open: boolean
   onClose: () => void
   shift: ShiftSummary | null
+  canAssign?: boolean
 }
 
 interface StaffCandidate {
@@ -55,7 +56,7 @@ interface StaffCandidate {
   locationLinks?: { type: string; location?: { id: string } }[]
 }
 
-export function AssignmentModal({ open, onClose, shift }: AssignmentModalProps) {
+export function AssignmentModal({ open, onClose, shift, canAssign = false }: AssignmentModalProps) {
   const [search, setSearch] = useState('')
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [overrideReason, setOverrideReason] = useState('')
@@ -143,13 +144,17 @@ export function AssignmentModal({ open, onClose, shift }: AssignmentModalProps) 
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-5xl max-h-[92vh] overflow-hidden flex flex-col p-0">
         <DialogHeader className="px-6 pt-6">
-          <DialogTitle className="text-xl tracking-tight text-slate-900">Assign Staff to Shift</DialogTitle>
+          <DialogTitle className="text-xl tracking-tight text-slate-900">
+            {canAssign ? 'Assign Staff to Shift' : 'Shift Details'}
+          </DialogTitle>
           <DialogDescription className="text-sm text-slate-600">
-            Select a qualified teammate, review rule checks, then confirm assignment.
+            {canAssign
+              ? 'Select a qualified teammate, review rule checks, then confirm assignment.'
+              : 'Shift information and current assignments.'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-5 px-6 pb-6 overflow-y-auto">
+        <div className={canAssign ? 'grid grid-cols-1 md:grid-cols-5 gap-5 px-6 pb-6 overflow-y-auto' : 'px-6 pb-6 overflow-y-auto'}>
           {/* Left panel — Shift details */}
           <aside className="md:col-span-2 space-y-4 rounded-lg bg-slate-50 p-5 border border-slate-200">
             <div>
@@ -195,10 +200,16 @@ export function AssignmentModal({ open, onClose, shift }: AssignmentModalProps) 
             {shift.isPremium && (
               <Badge className="bg-violet-100 text-violet-800 border-0">★ Premium Shift</Badge>
             )}
+
+            {!canAssign && (
+              <div className="pt-2 border-t border-slate-200">
+                <Button variant="outline" onClick={onClose} className="w-full">Close</Button>
+              </div>
+            )}
           </aside>
 
-          {/* Right panel — Staff selection + violation banner */}
-          <div className="md:col-span-3 space-y-3">
+          {/* Right panel — Staff selection + violation banner (managers/admins only) */}
+          {canAssign && <div className="md:col-span-3 space-y-3">
             <div>
               <label className="text-sm font-medium text-slate-700">Select staff member</label>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -308,7 +319,7 @@ export function AssignmentModal({ open, onClose, shift }: AssignmentModalProps) 
                 )}
               </Button>
             </div>
-          </div>
+          </div>}
         </div>
       </DialogContent>
     </Dialog>

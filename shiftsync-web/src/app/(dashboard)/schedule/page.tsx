@@ -298,6 +298,7 @@ export default function SchedulePage() {
       {/* Assignment modal */}
       <AssignmentModal
         open={!!selectedShift}
+        canAssign={isManagerOrAdmin}
         onClose={() => setSelectedShift(null)}
         shift={
           selectedShift && {
