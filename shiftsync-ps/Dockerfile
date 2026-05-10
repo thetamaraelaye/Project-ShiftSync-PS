@@ -1,11 +1,14 @@
-FROM node:18
+FROM node:20-alpine
 WORKDIR /usr/src/app
 RUN corepack enable && corepack prepare pnpm@latest --activate
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install
+RUN pnpm install --frozen-lockfile
 COPY prisma ./prisma
-RUN npx prisma generate
+COPY prisma.config.ts ./
+COPY tsconfig.json ./
+RUN pnpm prisma generate
 COPY . .
 RUN pnpm build
-EXPOSE 5675
+ENV NODE_ENV=production
+EXPOSE 8030
 CMD pnpm prisma migrate deploy && pnpm start:prod

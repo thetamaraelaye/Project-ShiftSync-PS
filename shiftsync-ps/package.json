@@ -1,7 +1,7 @@
 {
-  "name": "nest-backend-boilerplate",
-  "version": "0.0.1",
-  "description": "NestJS backend boilerplate with Prisma, JWT auth, Bull queues, and more.",
+  "name": "shiftsync-api",
+  "version": "1.0.0",
+  "description": "ShiftSync — Multi-Location Staff Scheduling API",
   "author": "Tamara",
   "private": true,
   "license": "UNLICENSED",
