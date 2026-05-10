@@ -22,14 +22,7 @@ function buildAllowedOrigins(): string[] {
     .map((value) => normalizeOrigin(value))
     .filter(Boolean);
 
-  return Array.from(
-    new Set([
-      ...configured,
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'https://project-shift-sync-ps.vercel.app',
-    ]),
-  );
+  return Array.from(new Set([...configured, 'http://localhost:3000', 'http://localhost:3001']));
 }
 
 @WebSocketGateway({
@@ -102,7 +95,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       }
 
       this.logger.log(`Client connected: ${client.id} (${payload.role} ${payload.sub})`);
-    } catch (err) {
+    } catch {
       this.logger.warn(`Client ${client.id} invalid token — disconnecting`);
       client.disconnect();
     }
@@ -115,12 +108,18 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   // ─── Client → Server: join a location room (staff viewing a location's schedule) ──
 
   @SubscribeMessage('join:location')
-  handleJoinLocation(@MessageBody() data: { locationId: string }, @ConnectedSocket() client: Socket) {
+  handleJoinLocation(
+    @MessageBody() data: { locationId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
     client.join(`location:${data.locationId}`);
   }
 
   @SubscribeMessage('leave:location')
-  handleLeaveLocation(@MessageBody() data: { locationId: string }, @ConnectedSocket() client: Socket) {
+  handleLeaveLocation(
+    @MessageBody() data: { locationId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
     client.leave(`location:${data.locationId}`);
   }
 

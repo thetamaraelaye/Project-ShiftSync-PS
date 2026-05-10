@@ -6,9 +6,14 @@ import {
 } from '@nestjs/common';
 import { PrismaConfig } from '@configs/database.config';
 import { toZonedTime } from 'date-fns-tz';
-import { getDay, addDays, startOfDay } from 'date-fns';
+import { getDay, addDays } from 'date-fns';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { CreateShiftDto, UpdateShiftDto, PublishWeekDto, WeekScheduleQueryDto } from './dto/shifts.dto';
+import {
+  CreateShiftDto,
+  UpdateShiftDto,
+  PublishWeekDto,
+  WeekScheduleQueryDto,
+} from './dto/shifts.dto';
 import { ShiftStatus, Skill } from '@db';
 
 const EDIT_CUTOFF_HOURS = 48;
@@ -35,10 +40,7 @@ export class ShiftsService {
 
     // Staff only see published shifts (or their own assignments)
     if (userRole === 'STAFF') {
-      where.OR = [
-        { status: ShiftStatus.PUBLISHED },
-        { assignments: { some: { userId } } },
-      ];
+      where.OR = [{ status: ShiftStatus.PUBLISHED }, { assignments: { some: { userId } } }];
     }
 
     // Managers see only their assigned locations
@@ -66,7 +68,12 @@ export class ShiftsService {
           where: { status: { not: 'CANCELLED' } },
           include: {
             user: {
-              select: { id: true, firstName: true, lastName: true, skills: { select: { skill: true } } },
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                skills: { select: { skill: true } },
+              },
             },
           },
         },
@@ -84,7 +91,10 @@ export class ShiftsService {
           include: {
             user: {
               select: {
-                id: true, firstName: true, lastName: true, email: true,
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
                 skills: { select: { skill: true } },
               },
             },
@@ -113,6 +123,11 @@ export class ShiftsService {
 
     const isPremium = this.checkIfPremium(startTime, location.timezone);
 
+    // Validate requiredSkill is present and valid
+    if (!dto.requiredSkill || !Object.values(Skill).includes(dto.requiredSkill)) {
+      throw new BadRequestException('requiredSkill is required and must be a valid Skill');
+    }
+
     const shift = await this.prisma.shift.create({
       data: {
         locationId: dto.locationId,
@@ -134,7 +149,12 @@ export class ShiftsService {
         entityId: shift.id,
         action: 'SHIFT_CREATED',
         actorId: creatorId,
-        after: { locationId: shift.locationId, startTime, endTime, requiredSkill: shift.requiredSkill },
+        after: {
+          locationId: shift.locationId,
+          startTime,
+          endTime,
+          requiredSkill: shift.requiredSkill,
+        },
       },
     });
 
@@ -146,7 +166,11 @@ export class ShiftsService {
     this.checkManagerAccess(shift.locationId, actorRole, actorId);
     this.checkEditCutoff(shift.startTime, shift.status);
 
-    const before = { startTime: shift.startTime, endTime: shift.endTime, requiredSkill: shift.requiredSkill };
+    const before = {
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+      requiredSkill: shift.requiredSkill,
+    };
 
     const startTime = dto.startTime ? new Date(dto.startTime) : shift.startTime;
     const endTime = dto.endTime ? new Date(dto.endTime) : shift.endTime;
@@ -198,7 +222,11 @@ export class ShiftsService {
         action: 'SHIFT_UPDATED',
         actorId,
         before,
-        after: { startTime: updated.startTime, endTime: updated.endTime, requiredSkill: updated.requiredSkill },
+        after: {
+          startTime: updated.startTime,
+          endTime: updated.endTime,
+          requiredSkill: updated.requiredSkill,
+        },
       },
     });
 
