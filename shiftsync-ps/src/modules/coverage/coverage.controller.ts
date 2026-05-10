@@ -36,8 +36,11 @@ export class CoverageController {
   @ApiOperation({
     summary: 'Get requests awaiting manager approval (Manager: their locations only)',
   })
-  getPendingApprovals(@CurrentUser('id') managerId: string) {
-    return this.coverageService.getPendingApprovals(managerId);
+  getPendingApprovals(
+    @CurrentUser('id') actorId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return this.coverageService.getPendingApprovals(actorId, role);
   }
 
   @Patch('requests/:id/respond')
@@ -56,9 +59,10 @@ export class CoverageController {
   managerDecision(
     @Param('id') requestId: string,
     @Body() dto: ManagerApprovalDto,
-    @CurrentUser('id') managerId: string,
+    @CurrentUser('id') actorId: string,
+    @CurrentUser('role') role: string,
   ) {
-    return this.coverageService.managerDecision(requestId, dto, managerId);
+    return this.coverageService.managerDecision(requestId, dto, actorId, role);
   }
 
   @Post('pickup/:shiftId')

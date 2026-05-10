@@ -7,6 +7,7 @@ import {
 import { PrismaConfig } from '@configs/database.config';
 import { toZonedTime } from 'date-fns-tz';
 import { getDay, addDays, startOfDay } from 'date-fns';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CreateShiftDto, UpdateShiftDto, PublishWeekDto, WeekScheduleQueryDto } from './dto/shifts.dto';
 import { ShiftStatus, Skill } from '@db';
 
@@ -16,7 +17,10 @@ const PREMIUM_SHIFT_HOUR_START = 18; // 6 PM in location timezone
 
 @Injectable()
 export class ShiftsService {
-  constructor(private prisma: PrismaConfig) {}
+  constructor(
+    private prisma: PrismaConfig,
+    private eventEmitter: EventEmitter2,
+  ) {}
 
   async getWeekSchedule(query: WeekScheduleQueryDto, userRole: string, userId: string) {
     const weekStart = new Date(query.weekStart);
@@ -154,6 +158,11 @@ export class ShiftsService {
     const location = await this.prisma.location.findUnique({ where: { id: shift.locationId } });
     const isPremium = this.checkIfPremium(startTime, location.timezone);
 
+    const pendingRequests = await this.prisma.swapRequest.findMany({
+      where: { shiftId: id, status: { in: ['PENDING', 'ACCEPTED', 'MANAGER_REVIEW'] } },
+      select: { id: true, requesterId: true, targetId: true },
+    });
+
     const updated = await this.prisma.shift.update({
       where: { id },
       data: { ...dto, startTime, endTime, isPremium },
@@ -165,6 +174,22 @@ export class ShiftsService {
       where: { shiftId: id, status: { in: ['PENDING', 'ACCEPTED', 'MANAGER_REVIEW'] } },
       data: { status: 'CANCELLED' },
     });
+
+    if (cancelledSwaps.count > 0) {
+      for (const request of pendingRequests) {
+        const notifyUsers = [request.requesterId, request.targetId].filter(Boolean) as string[];
+        for (const userId of notifyUsers) {
+          this.eventEmitter.emit('notification.send', {
+            userId,
+            type: 'SWAP_RESOLVED',
+            title: 'Coverage request cancelled',
+            message:
+              'Your swap/drop request was cancelled because the shift schedule was edited by a manager.',
+            metadata: { requestId: request.id, shiftId: id, reason: 'SHIFT_EDITED' },
+          });
+        }
+      }
+    }
 
     await this.prisma.auditLog.create({
       data: {

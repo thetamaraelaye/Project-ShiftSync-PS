@@ -170,7 +170,12 @@ export class CoverageService {
 
   // ─── Manager approves or rejects ──────────────────────────────────────────
 
-  async managerDecision(requestId: string, dto: ManagerApprovalDto, managerId: string) {
+  async managerDecision(
+    requestId: string,
+    dto: ManagerApprovalDto,
+    actorId: string,
+    actorRole: string,
+  ) {
     const request = await this.requireRequest(requestId);
 
     // Determine which statuses are valid for manager action
@@ -179,14 +184,16 @@ export class CoverageService {
       throw new BadRequestException(`Request cannot be actioned in status: ${request.status}`);
     }
 
-    // Verify manager has access to this location
-    const hasAccess = await this.prisma.userLocation.findFirst({
-      where: { userId: managerId, locationId: request.shift.locationId, type: 'MANAGED' },
-    });
-    if (!hasAccess) throw new ForbiddenException('You do not manage this location');
+    // Admin has global access. Manager must manage the location.
+    if (actorRole !== 'ADMIN') {
+      const hasAccess = await this.prisma.userLocation.findFirst({
+        where: { userId: actorId, locationId: request.shift.locationId, type: 'MANAGED' },
+      });
+      if (!hasAccess) throw new ForbiddenException('You do not manage this location');
+    }
 
     if (dto.decision === 'APPROVED') {
-      await this.executeApprovedSwap(request, managerId);
+      await this.executeApprovedSwap(request, actorId);
     } else {
       await this.prisma.swapRequest.update({
         where: { id: requestId },
@@ -308,17 +315,21 @@ export class CoverageService {
     });
   }
 
-  async getPendingApprovals(managerId: string) {
-    const managedLinks = await this.prisma.userLocation.findMany({
-      where: { userId: managerId, type: 'MANAGED' },
-      select: { locationId: true },
-    });
-    const locationIds = managedLinks.map((l) => l.locationId);
+  async getPendingApprovals(actorId: string, actorRole: string) {
+    let locationIds: string[] = [];
+
+    if (actorRole !== 'ADMIN') {
+      const managedLinks = await this.prisma.userLocation.findMany({
+        where: { userId: actorId, type: 'MANAGED' },
+        select: { locationId: true },
+      });
+      locationIds = managedLinks.map((l) => l.locationId);
+    }
 
     return this.prisma.swapRequest.findMany({
       where: {
         status: 'MANAGER_REVIEW',
-        shift: { locationId: { in: locationIds } },
+        ...(actorRole === 'ADMIN' ? {} : { shift: { locationId: { in: locationIds } } }),
       },
       orderBy: { updatedAt: 'asc' },
       include: {

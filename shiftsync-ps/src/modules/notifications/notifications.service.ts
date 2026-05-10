@@ -10,6 +10,7 @@ interface SendNotificationPayload {
   title: string;
   message: string;
   metadata?: Record<string, any>;
+  skipAdminBroadcast?: boolean;
 }
 
 @Injectable()
@@ -36,6 +37,45 @@ export class NotificationsService {
       userId: payload.userId,
       notification,
     });
+
+    // Keep admins aware of all system activity for evaluation and oversight.
+    if (!payload.skipAdminBroadcast) {
+      const admins = await this.prisma.user.findMany({
+        where: {
+          role: 'ADMIN',
+          status: 'ACTIVE',
+          id: { not: payload.userId },
+        },
+        select: { id: true },
+      });
+
+      if (admins.length > 0) {
+        const adminNotifications = await Promise.all(
+          admins.map((admin) =>
+            this.prisma.notification.create({
+              data: {
+                userId: admin.id,
+                type: 'GENERAL',
+                title: `[System] ${payload.title}`,
+                message: payload.message,
+                metadata: {
+                  sourceType: payload.type,
+                  sourceUserId: payload.userId,
+                  ...(payload.metadata ?? {}),
+                },
+              },
+            }),
+          ),
+        );
+
+        for (const adminNotification of adminNotifications) {
+          this.eventEmitter.emit('notification.created', {
+            userId: adminNotification.userId,
+            notification: adminNotification,
+          });
+        }
+      }
+    }
   }
 
   async getMyNotifications(userId: string, unreadOnly = false) {
